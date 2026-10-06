@@ -57,7 +57,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "node api.js && expo start",
     "dev-client": "expo start --dev-client",
     "dev:build:android": "eas build --profile development --platform android",
     "dev:build:ios": "eas build --profile development --platform ios",
@@ -65,7 +65,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "build": "expo export --platform web",
+    "build": "node api.js && expo export --platform web",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",

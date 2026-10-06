@@ -75,7 +75,10 @@ describe('authErrors', () => {
     });
 
     it('maps a native timeout to a safe passkey error', () => {
-      const err = mapNativePasskeyError({ error: 'TimeoutError', message: 'native timeout details' });
+      const err = mapNativePasskeyError({
+        error: 'TimeoutError',
+        message: 'native timeout details',
+      });
 
       expect(err.code).toBe(AuthErrorCode.TIMEOUT);
       expect(err.message).not.toContain('native timeout details');

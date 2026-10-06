@@ -30,7 +30,7 @@ describe('nfcSessionStore', () => {
 
   it('clears the active flag when a scan fails', () => {
     useNfcSessionStore.getState().beginScanning();
-    useNfcSessionStore.getState().setError(new NfcError('NFC_UNAVAILABLE', 'scan failed'));
+    useNfcSessionStore.getState().setError(new NfcError('UNSUPPORTED', 'scan failed'));
 
     expect(useNfcSessionStore.getState().status).toBe('error');
     expect(useNfcSessionStore.getState().nfcActive).toBe(false);
