@@ -21,6 +21,11 @@ describe('paymentRequest schema', () => {
     expect(parsePaymentRequest(basePayload)).toEqual(basePayload);
   });
 
+  it('accepts a valid XLM payment request', () => {
+    const request = { ...basePayload, asset: 'XLM', amount: '1000' };
+    expect(parsePaymentRequest(request)).toEqual(request);
+  });
+
   it('rejects invalid Stellar public keys', () => {
     expect(() => parsePaymentRequest({ ...basePayload, recipient: 'INVALID' })).toThrow();
   });

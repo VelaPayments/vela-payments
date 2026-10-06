@@ -4,7 +4,7 @@
 
 The NFC codec writes the shared `payment-request` version 1 contract used by
 the server. Its wire timestamps are ISO 8601 UTC strings; the app's internal
-`payment_request` object continues to use Unix seconds. The codec converts
+`payment_request` object continues to use Unix seconds (including fractional seconds to preserve wire milliseconds). The codec converts
 between these representations at the NFC boundary. The matching fixture is
 `src/features/nfc/fixtures/payment-request.v1.json` and is checked by the
 server contract tests as well.
@@ -34,3 +34,9 @@ Troubleshooting
 - NFC Unavailable: ensure device supports NFC and app has permissions.
 - NFC Disabled: ask user to enable in OS settings.
 - Timeout: ask users to bring devices closer and retry.
+
+## Validation and compatibility
+
+Fresh native NFC reads enforce the shared five-minute timestamp clock window and the maximum 24-hour request lifetime. Amounts reject leading zeros and nonfinite values. UTC dates must represent a real calendar date, and supported optional fields retain their contract limits. Encoding validates a request before serializing it.
+
+The decoder also accepts the previous internal request format for existing tags. Decoding without `rejectExpired` is for structural/archival inspection; live reads use `rejectExpired: true`. Milliseconds from version 1 timestamps are preserved through decode/encode. NFC MIME and app scheme identifiers remain unchanged.

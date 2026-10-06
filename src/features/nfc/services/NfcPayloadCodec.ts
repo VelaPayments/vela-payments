@@ -12,12 +12,13 @@ const textDecoder = new TextDecoder();
 const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 export function encodePaymentRequest(request: PaymentRequest): Uint8Array {
+  const validated = parsePaymentRequest(request);
   const json = JSON.stringify({
-    ...request,
+    ...validated,
     type: 'payment-request',
     version: 1,
-    timestamp: new Date(request.timestamp * 1000).toISOString(),
-    expiresAt: new Date(request.expiresAt * 1000).toISOString(),
+    timestamp: new Date(Math.round(validated.timestamp * 1000)).toISOString(),
+    expiresAt: new Date(Math.round(validated.expiresAt * 1000)).toISOString(),
   });
   const bytes = textEncoder.encode(json);
 
@@ -69,12 +70,18 @@ function fromPaymentRequestV1(input: unknown): unknown {
   const timestampMs = Date.parse(payload.timestamp);
   const expiresAtMs = Date.parse(payload.expiresAt);
   if (!Number.isFinite(timestampMs) || !Number.isFinite(expiresAtMs)) return input;
+  const canonical = (value: string) => (value.includes('.') ? value : value.replace('Z', '.000Z'));
+  if (
+    new Date(timestampMs).toISOString() !== canonical(payload.timestamp) ||
+    new Date(expiresAtMs).toISOString() !== canonical(payload.expiresAt)
+  )
+    return input;
   const { version: _version, ...request } = payload;
   return {
     ...request,
     type: 'payment_request',
-    timestamp: Math.floor(timestampMs / 1000),
-    expiresAt: Math.floor(expiresAtMs / 1000),
+    timestamp: timestampMs / 1000,
+    expiresAt: expiresAtMs / 1000,
   };
 }
 

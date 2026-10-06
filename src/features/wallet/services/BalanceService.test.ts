@@ -80,9 +80,23 @@ describe('parseBalances', () => {
     });
   });
 
-  it('ignores a native balance with a non-XLM asset type', () => {
+  it('does not treat an issued XLM credit asset as native XLM', () => {
     const result = parseBalances({
-      balances: [{ asset_type: 'credit_alphanum4', asset_code: 'XLM', balance: '9' } as never],
+      balances: [
+        {
+          asset_type: 'credit_alphanum4',
+          asset_code: 'XLM',
+          asset_issuer: USDC_ISSUER,
+          balance: '9.0000000',
+          limit: '1000.0000000',
+          buying_liabilities: '0.0000000',
+          selling_liabilities: '0.0000000',
+          last_modified_ledger: 1,
+          is_authorized: true,
+          is_authorized_to_maintain_liabilities: true,
+          is_clawback_enabled: false,
+        },
+      ],
     });
 
     expect(result.xlm).toBe('0');

@@ -1,48 +1,53 @@
-# Development Guide
+# Development guide
 
-Peer-to-peer contactless (NFC) payments on Stellar with a self-custodial wallet and passkey authentication.
+Vela is a Stellar testnet payment prototype built with Expo SDK 56, React Native and TypeScript. Physical-device payments and complete backend authentication integration remain under development.
 
-## Technology
-- Node.js
+## Requirements
+
+- Node.js 20.19 or newer and npm.
+- A physical Android or iOS device for native NFC and passkey work.
+- A Vela development build: Expo Go cannot load the required native modules.
+- Domain associations and signing configuration for native passkeys. The RP domain and compatibility identifier migration remain deferred; do not change them independently.
 
 ## Setup
-- Install dependencies with `npm ci`.
-- `npm run android` runs `expo start --android`.
-- `npm run dev-client` runs `expo start --dev-client`.
-- `npm run format` runs `prettier --write .`.
-- `npm run ios` runs `expo start --ios`.
-- `npm run reset-project` runs `node ./scripts/reset-project.js`.
-- `npm run start` runs `expo start`.
-- `npm run web` runs `expo start --web`.
 
-## Project checks
-- `npm run build` runs `tsc --noEmit`.
-- `npm run dev:build:android` runs `eas build --profile development --platform android`.
-- `npm run dev:build:ios` runs `eas build --profile development --platform ios`.
-- `npm run format:check` runs `prettier --check .`.
-- `npm run lint` runs `expo lint`.
-- `npm run lint:fix` runs `expo lint --fix`.
-- `npm run test` runs `jest`.
-- `npm run test:watch` runs `jest --watch`.
-- `npm run typecheck` runs `tsc --noEmit`.
+1. Run `npm ci`.
+2. Copy `.env.example` to `.env` and review the public testnet settings.
+3. Build the native app with `npx expo run:android` or `npx expo run:ios`, or use `npm run dev:build:android` / `npm run dev:build:ios` after configuring EAS and signing.
+4. Run `npm run dev-client` and open the project in the installed development build.
+
+The EAS commands require the EAS CLI and an authenticated Expo account. Physical iOS builds also require device provisioning and Apple signing credentials. Native dependency changes require rebuilding the development client.
+
+For the browser UI preview, run `npm run web`. Browser NFC and native passkey onboarding are unavailable; the preview does not demonstrate physical-device transfers.
+
+## Quality checks
+
+| Command | Purpose |
+| --- | --- |
+| `npm run typecheck` | TypeScript validation |
+| `npm run lint` | ESLint checks |
+| `npm run format:check` | Formatting validation |
+| `npm test -- --runInBand` | Unit tests |
+| `npm run build` | Static Expo web export to `dist` |
 
 ## Configuration
-Environment variable names documented in `.env.example` (values intentionally omitted):
+
+The client reads these public environment variables:
+
+- `EXPO_PUBLIC_STELLAR_NETWORK`
 - `EXPO_PUBLIC_HORIZON_URL`
 - `EXPO_PUBLIC_RPC_URL`
-- `EXPO_PUBLIC_STELLAR_NETWORK`
 - `EXPO_PUBLIC_USDC_ISSUER`
 
-## Repository layout
-- `.agents/`
-- `.claude/`
-- `.cursor/`
-- `.vscode/`
-- `assets/`
-- `docs/`
-- `src/`
-- `types/`
+Testnet has public defaults. Mainnet requires explicit values and is not a supported prototype payment deployment. Never put secret keys in `EXPO_PUBLIC_*` variables.
 
-## Contributing
-Keep changes focused, update documentation when behavior changes, and include a clear summary with proposed changes.
+## Project layout
 
+- `src/app/`: Expo Router routes.
+- `src/features/`: authentication, wallet, NFC, receive and send features.
+- `src/components/`: shared interface components.
+- `src/lib/`: configuration, analytics and secure storage.
+- `assets/brand/`: Vela brand assets.
+- `docs/`: architecture and contributor guides.
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md), [deployment instructions](deployment.md), and the [README project status](../README.md#project-status) before opening a PR. Verify the current implementation before claiming a feature is complete.
