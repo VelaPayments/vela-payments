@@ -10,7 +10,7 @@ If working through Drips, apply through its dashboard after repository approval.
 
 ## Setup and checks
 
-Use the README setup steps. Keep private environment files out of Git, use testnet accounts, and avoid logging credentials or raw provider errors.
+Use the README setup steps. The Expo 56 toolchain requires Node.js 20.19+; keep private environment files out of Git, use testnet accounts, and avoid logging credentials or raw provider errors.
 
 ```sh
 npm ci

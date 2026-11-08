@@ -1,6 +1,6 @@
 /**
- * Placeholder toast facade for MVP feedback.
- * Replace with a native toast/snackbar library when UI hardening lands.
+ * Lightweight toast facade for MVP feedback.
+ * Replace the console transport with a native toast/snackbar library when UI hardening lands.
  *
  * Policy: never pass private keys, seeds, full NFC payloads, or other secrets in messages.
  */

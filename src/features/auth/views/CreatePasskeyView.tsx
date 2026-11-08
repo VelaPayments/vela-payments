@@ -10,14 +10,19 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '../hooks/useAuth';
 import { PasskeyService } from '../services/PasskeyService';
+import { TextInput } from '@/components/ui/TextInput';
+import { env } from '@/lib/env';
 
 type ViewState = 'idle' | 'loading' | 'success' | 'error';
 
 export function CreatePasskeyView() {
   const router = useRouter();
   const theme = useTheme();
-  const { registerPasskey, state } = useAuth();
+  const { registerPasskey, signInWithPassword, signUpWithPassword, state } = useAuth();
   const [viewState, setViewState] = useState<ViewState>('idle');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const serverAuthEnabled = Boolean(env.supabaseUrl && env.supabaseAnonKey);
   const supportInfo = PasskeyService.getSupportInfo();
 
   useEffect(() => {
@@ -30,12 +35,44 @@ export function CreatePasskeyView() {
     if (!supportInfo.isSupported || viewState === 'loading') return;
     setViewState('loading');
     try {
+      if (serverAuthEnabled && !state.sessionToken) {
+        const authenticated = await signInWithPassword(email, password);
+        if (!authenticated) {
+          setViewState('error');
+          return;
+        }
+      }
       const success = await registerPasskey('Vela user');
       setViewState(success ? 'success' : 'error');
     } catch {
       setViewState('error');
     }
-  }, [registerPasskey, supportInfo.isSupported, viewState]);
+  }, [
+    email,
+    password,
+    registerPasskey,
+    serverAuthEnabled,
+    signInWithPassword,
+    state.sessionToken,
+    supportInfo.isSupported,
+    viewState,
+  ]);
+
+  const handleCreateAccount = useCallback(async () => {
+    if (!supportInfo.isSupported || viewState === 'loading') return;
+    setViewState('loading');
+    try {
+      const authenticated = await signUpWithPassword(email, password);
+      if (!authenticated) {
+        setViewState('error');
+        return;
+      }
+      const success = await registerPasskey('Vela user');
+      setViewState(success ? 'success' : 'error');
+    } catch {
+      setViewState('error');
+    }
+  }, [email, password, registerPasskey, signUpWithPassword, supportInfo.isSupported, viewState]);
 
   return (
     <Screen scrollable>
@@ -75,6 +112,42 @@ export function CreatePasskeyView() {
             text="Sign in without creating or remembering a password."
           />
         </Card>
+
+        {serverAuthEnabled && !state.sessionToken && (
+          <Card style={styles.authCard}>
+            <ThemedText type="smallBold">Connect your Vela account</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Use the Supabase account that owns your Vela profile before registering this device
+              passkey.
+            </ThemedText>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="Email address"
+              editable={viewState !== 'loading'}
+            />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Password"
+              editable={viewState !== 'loading'}
+            />
+            <ThemedText type="small" themeColor="textSecondary">
+              Use an existing account to sign in, or create a new one below.
+            </ThemedText>
+            <Button
+              label="Create account and passkey"
+              variant="secondary"
+              onPress={handleCreateAccount}
+              loading={viewState === 'loading'}
+              disabled={viewState === 'loading' || !email || password.length < 8}
+            />
+          </Card>
+        )}
 
         {!supportInfo.isSupported && (
           <Card style={styles.notice}>
@@ -120,7 +193,11 @@ export function CreatePasskeyView() {
               }
               onPress={handleCreatePasskey}
               loading={viewState === 'loading'}
-              disabled={!supportInfo.isSupported || viewState === 'loading'}
+              disabled={
+                !supportInfo.isSupported ||
+                viewState === 'loading' ||
+                (serverAuthEnabled && !state.sessionToken && (!email || password.length < 8))
+              }
               accessibilityLabel="Create your Vela passkey"
               accessibilityHint={
                 supportInfo.isSupported
@@ -172,6 +249,7 @@ const styles = StyleSheet.create({
   header: { gap: 12 },
   description: { lineHeight: 26 },
   infoCard: { gap: 24 },
+  authCard: { gap: 12 },
   infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   infoText: { flex: 1, gap: 4 },
   notice: { gap: 8 },

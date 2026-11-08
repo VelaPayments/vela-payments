@@ -49,7 +49,13 @@ export const paymentRequestSchema = z
       ),
     timestamp: z.number().positive().max(8_640_000_000_000),
     expiresAt: z.number().positive().max(8_640_000_000_000),
-    memo: z.string().max(280).optional(),
+    memo: z
+      .string()
+      .max(280)
+      .refine((value) => new TextEncoder().encode(value).byteLength <= 28, {
+        message: "Memo must fit Stellar's 28-byte MEMO_TEXT limit",
+      })
+      .optional(),
     requestId: z.string().min(1).max(128).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })

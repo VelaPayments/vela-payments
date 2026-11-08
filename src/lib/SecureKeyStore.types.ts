@@ -14,6 +14,10 @@ export const SECURE_KEYS = {
   WALLET_PUBLIC_KEY: 'ding.wallet.publicKey',
   /** Serialized auth state for persistence across cold starts */
   AUTH_STATE: 'ding.auth.state',
+  /** Supabase access token used for authenticated Vela API requests */
+  SUPABASE_ACCESS_TOKEN: 'ding.auth.supabase.accessToken',
+  /** Supabase refresh token used to renew the API session */
+  SUPABASE_REFRESH_TOKEN: 'ding.auth.supabase.refreshToken',
   /** Session timestamp of last authenticated activity */
   SESSION_LAST_ACTIVE: 'ding.session.lastActive',
   /** Stellar account public key (StrKey G...) generated for the on-chain wallet */

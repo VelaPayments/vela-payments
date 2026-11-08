@@ -17,13 +17,15 @@ import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '../hooks/useAuth';
+import { useWallet } from '@/features/wallet/hooks/useWallet';
 
 export function SettingsAuthSection() {
-  const { state, logout } = useAuth();
+  const { logout } = useAuth();
+  const { publicKey: walletPublicKey } = useWallet();
   const theme = useTheme();
   const [pubkeyCopied, setPubkeyCopied] = useState(false);
 
-  const publicKey = state.publicKey;
+  const publicKey = walletPublicKey;
 
   const handleLogout = useCallback(() => {
     Alert.alert(
@@ -95,7 +97,7 @@ export function SettingsAuthSection() {
       ) : (
         <View style={[styles.pubkeyRow, { backgroundColor: theme.backgroundElement }]}>
           <ThemedText type="small" themeColor="textSecondary">
-            Sin llave de acceso registrada
+            Sin billetera Stellar registrada
           </ThemedText>
         </View>
       )}

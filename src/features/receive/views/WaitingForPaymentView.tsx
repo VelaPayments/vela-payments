@@ -1,10 +1,9 @@
 /**
  * Waiting for the payer's on-chain payment to settle (CLI-066).
  *
- * NOTE: balance-delta polling is out of scope for the MVP — this screen only
- * tracks elapsed time and times out after 60 seconds. A future iteration can
- * poll wallet balance every few seconds and resolve early via confirmSuccess()
- * once the expected delta is observed.
+ * The receiver polls the server's registered request for a confirmed payment;
+ * the timeout remains authoritative when the device is offline or the payer
+ * never completes the transfer.
  *
  * @see docs/receive-flow.md
  */
@@ -17,12 +16,17 @@ import { Button, LoadingSpinner, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useReceivePaymentContext } from '@/features/receive/hooks/useReceivePayment';
 import { receiveSession } from '@/features/receive/services/receiveSession';
+import { useOptionalAuth } from '@/features/auth/hooks/useAuth';
+import { PaymentApiClient } from '@/features/payments/services/PaymentApiClient';
+import { env } from '@/lib/env';
 
 const WAIT_TIMEOUT_MS = 60_000;
 
 export const WaitingForPaymentView = () => {
   const router = useRouter();
-  const { state, cancel, confirmFailure } = useReceivePaymentContext();
+  const { state, paymentRequest, cancel, confirmSuccess, confirmFailure } =
+    useReceivePaymentContext();
+  const auth = useOptionalAuth();
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timeoutStartedRef = useRef(false);
 
@@ -45,6 +49,39 @@ export const WaitingForPaymentView = () => {
 
     return cancelTimeout;
   }, [confirmFailure]);
+
+  useEffect(() => {
+    const token = auth?.state.sessionToken;
+    const requestId = paymentRequest?.requestId;
+    if (state !== 'waiting' || !token || !requestId) return;
+
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const request = await PaymentApiClient.getPaymentRequest(token, requestId);
+        if (stopped) return;
+        const expectedNetwork = env.stellarNetwork === 'testnet' ? 'TESTNET' : 'MAINNET';
+        if (request.network !== expectedNetwork) {
+          confirmFailure(`Payment request belongs to ${request.network}, not ${expectedNetwork}.`);
+          return;
+        }
+        if (request.paymentStatus === 'CONFIRMED') {
+          confirmSuccess(request.stellarTxHash ?? undefined);
+        } else if (request.paymentStatus === 'FAILED') {
+          confirmFailure('Payment failed on Stellar.');
+        }
+      } catch {
+        // A transient API failure should not end the receive session; the wait timeout remains authoritative.
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => void poll(), 3_000);
+    return () => {
+      stopped = true;
+      clearInterval(interval);
+    };
+  }, [auth?.state.sessionToken, confirmFailure, confirmSuccess, paymentRequest?.requestId, state]);
 
   useEffect(() => {
     if (state === 'success') {

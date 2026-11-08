@@ -31,6 +31,9 @@ import { receiveSession } from '@/features/receive/services/receiveSession';
 import { trustlineService } from '@/features/wallet/services/TrustlineService';
 import type { SupportedAssetCode } from '@/features/wallet/constants/assets';
 import { trackEvent } from '@/lib/analytics';
+import { PaymentApiClient } from '@/features/payments/services/PaymentApiClient';
+import { useOptionalAuth } from '@/features/auth/hooks/useAuth';
+import { env } from '@/lib/env';
 
 export type ReceiveState =
   | 'idle'
@@ -72,6 +75,8 @@ export function useReceivePayment(): UseReceivePaymentResult {
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const auth = useOptionalAuth();
+  const sessionToken = auth?.state.sessionToken ?? null;
 
   // Internal-only bookkeeping that is never read during render (only from
   // event handlers/effects), so it's safe to keep as a ref.
@@ -154,6 +159,18 @@ export function useReceivePayment(): UseReceivePaymentResult {
         }
 
         const request = paymentRequestBuilder.build({ amount, asset, recipientPublicKey });
+        if (sessionToken) {
+          const requestId = request.requestId;
+          if (!requestId) throw new Error('Payment request ID is missing.');
+          const persisted = await PaymentApiClient.createPaymentRequest(sessionToken, {
+            ...request,
+            requestId,
+          });
+          const expectedNetwork = env.stellarNetwork === 'testnet' ? 'TESTNET' : 'MAINNET';
+          if (persisted.network !== expectedNetwork) {
+            throw new Error(`Server network mismatch: expected ${expectedNetwork}.`);
+          }
+        }
         setPaymentRequest(request);
         setPhase('preparing');
       } catch (err) {
@@ -162,7 +179,7 @@ export function useReceivePayment(): UseReceivePaymentResult {
         throw err;
       }
     },
-    [confirmFailure]
+    [confirmFailure, sessionToken]
   );
 
   const startBroadcast = useCallback(async () => {

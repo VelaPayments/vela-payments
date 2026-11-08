@@ -1,18 +1,19 @@
 /**
- * CLI-025 — AuthApiClient stub
+ * CLI-025 — AuthApiClient
  *
- * Server-facing auth interfaces and stub implementation.
+ * Server-facing auth interfaces plus offline compatibility fallbacks.
  * These types mirror anticipated S06/S10 server DTOs.
  *
- * All methods are STUBBED — they return mock success responses
- * until the real server endpoints are live. Wire live endpoints
- * by replacing stub bodies with real fetch/axios calls.
+ * Server-backed WebAuthn registration is live. The legacy challenge methods
+ * remain local fallbacks for the offline preview until passwordless session
+ * refresh is implemented end to end.
  *
  * Coordination: S06/S07 (user/auth domain), S10/S11 (WebAuthn semantics),
  * S19 (observability/telemetry conventions).
  */
 
 import type { PasskeyAuthResult, PasskeyCredentialInfo } from './types';
+import { env } from '@/lib/env';
 
 // ─── Request / Response DTOs ──────────────────────────────────────────────────
 
@@ -77,17 +78,53 @@ export interface RevokeTokenResponse {
   revoked: boolean;
 }
 
-// ─── AuthApiClient (stub) ─────────────────────────────────────────────────────
+// ─── AuthApiClient ────────────────────────────────────────────────────────────
 
 export const AuthApiClient = {
-  /**
-   * [STUB] Request a registration challenge from the server.
-   * Replace with: POST /v1/auth/register/challenge
-   */
+  async getServerRegistrationOptions(token: string): Promise<Record<string, unknown>> {
+    const response = await fetch(`${env.apiBaseUrl}/webauthn/register/options`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(readApiError(body, response.status));
+    return body as Record<string, unknown>;
+  },
+
+  async verifyServerRegistration(
+    token: string,
+    credential: PasskeyCredentialInfo,
+    deviceName?: string
+  ): Promise<{ verified: true; credentialId: string }> {
+    const response = await fetch(`${env.apiBaseUrl}/webauthn/register/verify`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        id: credential.credentialId,
+        rawId: credential.rawId ?? credential.credentialId,
+        response: {
+          clientDataJSON: credential.clientDataJSON,
+          attestationObject: credential.attestationObject,
+          transports: credential.transports,
+        },
+        type: 'public-key',
+        ...(deviceName ? { deviceName } : {}),
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(readApiError(body, response.status));
+    return body as { verified: true; credentialId: string };
+  },
+
+  /** Legacy offline preview fallback; production registration uses the live methods above. */
   async getRegisterChallenge(
     _request: RegisterChallengeRequest
   ): Promise<RegisterChallengeResponse> {
-    // Stub: generate a local challenge — replace with real server call
+    // Keep the legacy preview path usable when Supabase is not configured.
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
     const challenge = Buffer.from(bytes).toString('base64url');
@@ -99,23 +136,17 @@ export const AuthApiClient = {
     };
   },
 
-  /**
-   * [STUB] Verify the registration credential with the server.
-   * Replace with: POST /v1/auth/register/verify
-   */
+  /** Legacy offline preview fallback; production registration uses the live method above. */
   async verifyRegistration(request: RegisterVerifyRequest): Promise<RegisterVerifyResponse> {
-    // Stub: return credential ID as placeholder public key
+    // The offline preview has no server credential store.
     return {
       publicKey: request.credential.credentialId,
-      sessionToken: `stub_token_${Date.now()}`,
+      sessionToken: `offline_preview_token_${Date.now()}`,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
   },
 
-  /**
-   * [STUB] Request an authentication challenge from the server.
-   * Replace with: POST /v1/auth/challenge
-   */
+  /** Legacy offline preview fallback for the local-only auth path. */
   async getAuthChallenge(_request: AuthChallengeRequest): Promise<AuthChallengeResponse> {
     const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
@@ -127,23 +158,26 @@ export const AuthApiClient = {
     };
   },
 
-  /**
-   * [STUB] Verify the authentication assertion with the server.
-   * Replace with: POST /v1/auth/verify
-   */
+  /** Legacy offline preview fallback for the local-only auth path. */
   async verifyAuthentication(request: AuthVerifyRequest): Promise<AuthVerifyResponse> {
     return {
-      sessionToken: `stub_token_${Date.now()}`,
+      sessionToken: `offline_preview_token_${Date.now()}`,
       publicKey: request.result.credentialId,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     };
   },
 
-  /**
-   * [STUB] Revoke a session token on the server.
-   * Replace with: POST /v1/auth/revoke
-   */
+  /** Local compatibility fallback; server sessions are revoked by Supabase logout. */
   async revokeToken(_request: RevokeTokenRequest): Promise<RevokeTokenResponse> {
     return { revoked: true };
   },
 };
+
+function readApiError(body: unknown, status: number): string {
+  if (body && typeof body === 'object' && 'message' in body) {
+    const message = (body as { message?: unknown }).message;
+    if (Array.isArray(message)) return message.join('; ');
+    if (typeof message === 'string') return message;
+  }
+  return `Vela API request failed (${status}).`;
+}

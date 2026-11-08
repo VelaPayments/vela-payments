@@ -1,6 +1,6 @@
 import { Horizon } from '@stellar/stellar-sdk';
 
-import { fetchBalances, parseBalances } from './BalanceService';
+import { fetchBalances, hasSufficientAssetBalance, parseBalances } from './BalanceService';
 
 jest.mock('@stellar/stellar-sdk', () => {
   const horizonServerInstance = {
@@ -18,7 +18,7 @@ jest.mock('@stellar/stellar-sdk', () => {
   };
 });
 
-const USDC_ISSUER = 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66';
+const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 const server = new Horizon.Server('https://horizon-testnet.stellar.org') as unknown as {
   loadAccount: jest.Mock;
 };
@@ -123,5 +123,24 @@ describe('fetchBalances', () => {
     server.loadAccount.mockRejectedValueOnce(new Error('Horizon unavailable'));
 
     await expect(fetchBalances('GPUBLICKEY')).rejects.toThrow('Horizon unavailable');
+  });
+});
+
+describe('hasSufficientAssetBalance', () => {
+  const balances = { xlm: '5.0000000', usdc: '2.5000000', hasUsdcTrustline: true };
+
+  it('compares XLM using seven-decimal precision', () => {
+    expect(hasSufficientAssetBalance(balances, 'XLM', '5.0000000')).toBe(true);
+    expect(hasSufficientAssetBalance(balances, 'XLM', '5.0000001')).toBe(false);
+  });
+
+  it('compares USDC against the configured asset balance', () => {
+    expect(hasSufficientAssetBalance(balances, 'USDC', '2.50')).toBe(true);
+    expect(hasSufficientAssetBalance(balances, 'USDC', '2.5000001')).toBe(false);
+  });
+
+  it('rejects malformed amounts and missing issued-asset balances', () => {
+    expect(hasSufficientAssetBalance({ ...balances, usdc: null }, 'USDC', '1')).toBe(false);
+    expect(hasSufficientAssetBalance(balances, 'XLM', 'not-an-amount')).toBe(false);
   });
 });

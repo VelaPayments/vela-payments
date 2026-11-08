@@ -1,6 +1,10 @@
 import { Networks } from '@stellar/stellar-sdk';
 
 export interface AppEnv {
+  apiBaseUrl: string;
+  webauthnRpId: string;
+  supabaseUrl: string | null;
+  supabaseAnonKey: string | null;
   stellarNetwork: 'testnet' | 'mainnet';
   horizonUrl: string;
   rpcUrl: string;
@@ -32,6 +36,20 @@ if (network !== 'testnet' && network !== 'mainnet') {
   );
 }
 
+const apiBaseUrl = getEnvVar(
+  'EXPO_PUBLIC_API_URL',
+  process.env.EXPO_PUBLIC_API_URL,
+  'http://localhost:3000/v1'
+);
+const webauthnRpId = getEnvVar(
+  'EXPO_PUBLIC_WEBAUTHN_RP_ID',
+  process.env.EXPO_PUBLIC_WEBAUTHN_RP_ID,
+  'dingpayments.app'
+);
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || null;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || null;
+
 // Public testnet defaults let the preview build without Vercel environment setup.
 // Mainnet must supply every value explicitly and never inherits testnet defaults.
 const horizonUrl = getEnvVar(
@@ -47,7 +65,7 @@ const rpcUrl = getEnvVar(
 const usdcIssuer = getEnvVar(
   'EXPO_PUBLIC_USDC_ISSUER',
   process.env.EXPO_PUBLIC_USDC_ISSUER,
-  network === 'testnet' ? 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66' : undefined
+  network === 'testnet' ? 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5' : undefined
 );
 
 // Security Guardrail: Mainnet shouldn't accidentally leak defaults
@@ -60,6 +78,10 @@ if (network === 'mainnet') {
 }
 
 export const env: AppEnv = {
+  apiBaseUrl,
+  webauthnRpId,
+  supabaseUrl,
+  supabaseAnonKey,
   stellarNetwork: network,
   horizonUrl,
   rpcUrl,

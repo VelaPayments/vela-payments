@@ -4,7 +4,7 @@ Vela is an early open-source Stellar testnet payment prototype with an Expo clie
 
 ## Submission description
 
-> Vela explores NFC payment requests and passkey-protected wallets on Stellar testnet. The repositories contain native client flows, payload validation, wallet services, and backend authentication/payment modules. The web deployment is a UI preview. We are seeking contributors for shared protocol alignment, validation fixes, authentication failure handling and deterministic regression coverage. End-to-end transfers and native device behavior are not yet demonstrated, and client authentication integration remains incomplete.
+> Vela is an open-source NFC payment experience for Stellar testnet. A receiver registers an expiring request, a payer scans and reviews it, authorizes with a passkey, signs the transaction locally, and submits it through the Vela server for confirmation. The repositories now include the shared lifecycle, wallet ownership checks, Horizon history and SEP-0007 interoperability. Native two-device settlement evidence is the remaining release gate.
 
 Repositories:
 
@@ -18,37 +18,51 @@ Repositories:
 - Contributor setup, focused PR expectations and check commands are in CONTRIBUTING.md.
 - The original single-case backlog was reviewed and consolidated into seven scoped candidates per repository, with 31 pre-existing mobile PR-linked issues preserved for review. See [issue audit](issue-audit.md).
 - Automated tests use mocks and fixtures. They establish regression coverage, not successful real-device payments or live transfer safety.
+- The current implementation includes a testnet E2E runbook and sanitized evidence template; no live transaction hash is claimed until the physical flow is executed.
+- The client-side [native testnet demo checklist](testnet-demo.md) documents the two-device passkey/NFC flow, retry behavior, and evidence to capture.
+- The payer flow performs issuer-specific USDC trustline and asset-balance preflights before first authorization; retries skip those checks and reconcile the stored transaction hash.
 - Build-plan and architecture documents include planned functionality; the README project status records the current limits.
 
-## Local verification — October 6, 2026
+## Verification status — November 8, 2026
 
 | Check               | Result                                                 |
 | ------------------- | ------------------------------------------------------ |
-| Formatting and lint | Passed (two existing NFC lint warnings)                |
-| Type checking       | Passed                                                 |
-| Build               | Passed                                                 |
-| Unit tests          | 16 suites / 112 tests passed                           |
-| End-to-end tests    | Physical-device payment/NFC/passkey flows not verified |
+| Formatting           | `git diff --check` passed                              |
+| Type checking        | Not run: local dependency install is incomplete        |
+| Build                | Not run: local dependency install is incomplete        |
+| Unit tests           | Not run: Jest binary is unavailable locally             |
+| End-to-end tests     | Physical-device payment/NFC/passkey flows not verified |
 
-These results were recorded during preparation. Check the current GitHub Actions run for the latest remote result.
+Earlier baseline checks are not evidence for this checkout. Use the current GitHub Actions run after dependencies are available.
 
-## First candidate set
+## Current release gate
+
+Dependency installation in the current workspace is blocked by unavailable npm
+registry packages, so the new client/server changes still require a clean CI
+run. After that, capture one real XLM or USDC testnet transfer using
+`vela-server/docs/testnet-e2e-runbook.md` and attach the sanitized record from
+`demo-evidence-template.md`.
+
+## Remaining candidate set
 
 Start with a manageable subset after maintainers confirm scope and dependencies. `wave-candidate` is a preparation label only; it does not enroll an issue in Drips.
 
-- #17: NFC byte-size boundaries and decoding errors — deterministic codec coverage.
+- #17: NFC byte-size boundaries and decoding errors — retain for broader device/codec coverage.
 - #27: Receive precision and request construction — input regression coverage.
 - #39: Timer concurrency and cancellation cleanup — fake-timer coverage.
 
-Trustline key/reserve checks and passkey failure handling require careful review. Unknown-field validation must stay coordinated with the shared contract work in vela-server#3.
+The shared contract alignment with vela-server#3 is implemented. Trustline key/reserve checks and passkey failure mapping have deterministic regression coverage; native-device and clean-CI verification remain.
 
 ## Apply through Drips
 
 1. Log into [Drips Wave](https://www.drips.network/wave) with the maintainer GitHub account.
 2. In Maintainers → Orgs and Repos, install the Drips GitHub app on VelaPayments and select these public repositories.
-3. Apply to the Stellar program, respecting the application limits displayed in the app, and use the description above.
-4. Wait for organizer approval. Repository approval is not guaranteed and has not been verified for Vela.
-5. Only after approval, add a small reviewed issue set to the program and set honest complexity values. Review applications promptly and verify PRs against their acceptance criteria.
+3. Because a rejected repository cannot be re-applied, use the repository's **Appeal** action in Maintainers → Orgs and Repos; follow the cooldown and application-limit status shown in the app.
+4. Include the substantive changes listed above, the [native testnet demo checklist](testnet-demo.md), and the server's completed release evidence record.
+5. Attach evidence only after a real two-device testnet transfer and independent Horizon verification. Approval is not guaranteed and has not been verified for Vela.
+6. After approval, add a small reviewed issue set with honest complexity values. Review applications promptly and verify PRs against their acceptance criteria.
+
+Drips' [maintainer guidance](https://docs.drips.network/wave/maintainers/participating-in-a-wave/) says appeals are reconsidered only when there has been substantive change in code, project quality, activity, or the concerns raised in the review. The [Terms & Rules](https://docs.drips.network/wave/terms-and-rules/) state that repository selection remains at the discretion of the organizers.
 
 The project remains a testnet prototype. Production hosting does not make it a mainnet wallet. The RP domain, storage identifiers, NFC MIME type and app scheme migration remain deferred. No contributor should bypass these compatibility decisions to make a demo appear complete.
 

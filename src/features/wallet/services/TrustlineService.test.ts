@@ -64,7 +64,7 @@ jest.mock('@/lib/SecureKeyStore', () => ({
   },
 }));
 
-const USDC_ISSUER = 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66';
+const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 
 const server = new Horizon.Server('https://horizon-testnet.stellar.org') as unknown as {
   loadAccount: jest.Mock;

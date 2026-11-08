@@ -7,13 +7,14 @@
  *
  * @see docs/receive-flow.md
  */
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useReceivePaymentContext } from '@/features/receive/hooks/useReceivePayment';
+import { stellarTransactionUrl } from '@/lib/stellarExplorer';
 
 function truncateHash(hash: string): string {
   if (hash.length <= 12) {
@@ -53,6 +54,13 @@ export const ReceiveSuccessView = () => {
       </View>
 
       <View style={styles.actions}>
+        {txHash ? (
+          <Button
+            label="View on Stellar Expert"
+            variant="secondary"
+            onPress={() => void Linking.openURL(stellarTransactionUrl(txHash))}
+          />
+        ) : null}
         <Button label="Receive Another" onPress={handleReceiveAnother} />
         <Button label="Done" variant="secondary" onPress={handleDone} />
       </View>

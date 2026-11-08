@@ -24,6 +24,9 @@ export class PaymentRequestBuilder {
       recipient: recipientPublicKey,
       asset,
       amount,
+      requestId:
+        globalThis.crypto?.randomUUID?.() ??
+        `req_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       ttlSeconds: DEFAULT_EXPIRY_TTL_SECONDS,
     });
   }

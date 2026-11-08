@@ -18,13 +18,15 @@ export interface PasskeyRegistrationOptions {
   userId: string;
   /** Display name shown in passkey dialog */
   displayName: string;
-  /** Base64url challenge from the server (or locally generated for offline MVP) */
+  /** Base64url challenge from the server (or locally generated for offline preview) */
   challenge: string;
 }
 
 export interface PasskeyCredentialInfo {
   /** Passkey credential ID — stable identifier returned after registration */
   credentialId: string;
+  /** Raw credential ID, when returned by the native WebAuthn implementation. */
+  rawId?: string;
   /** Client data JSON (base64) — for server verification when live */
   clientDataJSON: string;
   /** Attestation object (base64) — for server verification when live */
@@ -44,7 +46,7 @@ export type RegisterResult =
 export interface PasskeyAuthOptions {
   /** Relying party ID — must match the rpId used during registration */
   rpId: string;
-  /** Base64url challenge (locally generated for offline MVP) */
+  /** Base64url challenge (server-issued in production; local only for offline preview) */
   challenge: string;
   /** Human-readable reason shown in the OS prompt */
   reason?: string;
@@ -53,6 +55,8 @@ export interface PasskeyAuthOptions {
 export interface PasskeyAuthResult {
   /** Credential ID that was used */
   credentialId: string;
+  /** Raw credential ID, when returned by the native WebAuthn implementation. */
+  rawId?: string;
   /** Authenticator data (base64) */
   authenticatorData: string;
   /** Client data JSON (base64) */

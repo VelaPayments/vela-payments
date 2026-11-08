@@ -11,7 +11,6 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Screen, TextInput } from '@/components/ui';
 import { AnalyticsEvents } from '@/constants/analytics-events';
 import { Spacing } from '@/constants/theme';
-import { useAuth } from '@/features/auth/hooks/useAuth';
 import { receiveAmountSchema } from '@/features/receive/schemas/receiveAmount';
 import { useReceivePaymentContext } from '@/features/receive/hooks/useReceivePayment';
 import {
@@ -21,12 +20,15 @@ import {
 } from '@/features/wallet/constants/assets';
 import { useTheme } from '@/hooks/use-theme';
 import { trackEvent } from '@/lib/analytics';
+import { useWallet } from '@/features/wallet/hooks/useWallet';
+import { useOptionalAuth } from '@/features/auth/hooks/useAuth';
 
 export const ReceiveHomeView = () => {
   const theme = useTheme();
   const router = useRouter();
-  const { state: authState } = useAuth();
+  const { publicKey: walletPublicKey } = useWallet();
   const { prepare } = useReceivePaymentContext();
+  const auth = useOptionalAuth();
 
   // "Try Again" (CLI-068) forwards the previous amount/asset via route params
   // so the receiver doesn't have to retype them after a failure.
@@ -50,16 +52,18 @@ export const ReceiveHomeView = () => {
   const inlineError =
     amount.length > 0 && !validation.success ? validation.error.issues[0]?.message : undefined;
 
-  const canSubmit = validation.success && !submitting && Boolean(authState.publicKey);
+  const hasServerSession = Boolean(auth?.state.sessionToken);
+  const canSubmit =
+    validation.success && !submitting && Boolean(walletPublicKey) && hasServerSession;
 
   const handleSubmit = async () => {
-    if (!validation.success || !authState.publicKey) {
+    if (!validation.success || !walletPublicKey || !hasServerSession) {
       return;
     }
 
     setSubmitting(true);
     try {
-      await prepare(validation.data.amount, validation.data.asset, authState.publicKey);
+      await prepare(validation.data.amount, validation.data.asset, walletPublicKey);
       router.push('/receive/listening');
     } catch {
       router.push('/receive/failed');
@@ -74,6 +78,11 @@ export const ReceiveHomeView = () => {
       <ThemedText themeColor="textSecondary">
         Enter an amount and hold your phone near the payer to broadcast a request.
       </ThemedText>
+      {!hasServerSession ? (
+        <ThemedText themeColor="error" type="small">
+          Sign in before receiving a live payment so Vela can register and confirm the request.
+        </ThemedText>
+      ) : null}
 
       <View style={styles.field}>
         <ThemedText type="smallBold">Amount</ThemedText>

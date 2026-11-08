@@ -25,6 +25,8 @@ export interface AuthState {
   credentialId: string | null;
   /** ISO timestamp of the last successful authentication */
   lastAuthAt: string | null;
+  /** Supabase access token for server-backed operations */
+  sessionToken: string | null;
   /** Error from the most recent auth attempt, if any */
   lastError: string | null;
 }
@@ -34,6 +36,7 @@ export const INITIAL_AUTH_STATE: AuthState = {
   publicKey: null,
   credentialId: null,
   lastAuthAt: null,
+  sessionToken: null,
   lastError: null,
 };
 
@@ -41,7 +44,8 @@ export const INITIAL_AUTH_STATE: AuthState = {
 
 export type AuthAction =
   | { type: 'REHYDRATE'; payload: Partial<AuthState> }
-  | { type: 'PASSKEY_REGISTERED'; credentialId: string; publicKey: string }
+  | { type: 'PASSKEY_REGISTERED'; credentialId: string; publicKey: string | null }
+  | { type: 'SESSION_ESTABLISHED'; accessToken: string }
   | { type: 'AUTHENTICATED'; credentialId: string }
   | { type: 'LOCK' }
   | { type: 'LOGOUT' }
@@ -70,6 +74,9 @@ export function authReducer(state: AuthState, action: AuthAction): AuthState {
         lastAuthAt: new Date().toISOString(),
         lastError: null,
       };
+
+    case 'SESSION_ESTABLISHED':
+      return { ...state, sessionToken: action.accessToken, lastError: null };
 
     case 'AUTHENTICATED':
       if (state.status !== 'LOCKED' && state.status !== 'ONBOARDING') {

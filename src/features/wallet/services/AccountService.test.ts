@@ -24,6 +24,9 @@ jest.mock('@stellar/stellar-sdk', () => {
       }),
     },
     NotFoundError,
+    TransactionBuilder: {
+      fromXDR: jest.fn(),
+    },
     Networks: {
       PUBLIC: 'Public Global Stellar Network ; September 2015',
       TESTNET: 'Test SDF Network ; September 2015',
@@ -155,5 +158,91 @@ describe('AccountService.fundTestnetAccount', () => {
 
     expect(result.outcome).toBe('error');
     expect(friendbotCall).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccountService.validatePaymentTransaction', () => {
+  const transactionBuilder = jest.requireMock('@stellar/stellar-sdk').TransactionBuilder as {
+    fromXDR: jest.Mock;
+  };
+  const expected = {
+    sourcePublicKey: 'GSOURCE',
+    destination: 'GDESTINATION',
+    asset: 'XLM' as const,
+    amount: '1.25',
+    memo: 'coffee',
+  };
+
+  beforeEach(() => {
+    transactionBuilder.fromXDR.mockReset();
+  });
+
+  it('accepts a matching single-operation XLM payment', () => {
+    transactionBuilder.fromXDR.mockReturnValue({
+      source: 'GSOURCE',
+      operations: [
+        {
+          type: 'payment',
+          destination: 'GDESTINATION',
+          amount: '1.25',
+          asset: { isNative: () => true, getCode: () => 'XLM', getIssuer: () => '' },
+        },
+      ],
+      memo: { type: 'text', value: { toString: () => 'coffee' } },
+    });
+
+    expect(() => AccountService.validatePaymentTransaction('AAAA', expected)).not.toThrow();
+    expect(transactionBuilder.fromXDR).toHaveBeenCalledWith('AAAA', env.networkPassphrase);
+  });
+
+  it('rejects a payment whose destination or operation shape differs', () => {
+    transactionBuilder.fromXDR.mockReturnValue({
+      source: 'GSOURCE',
+      operations: [
+        {
+          type: 'payment',
+          destination: 'GATTACKER',
+          amount: '1.25',
+          asset: { isNative: () => true, getCode: () => 'XLM', getIssuer: () => '' },
+        },
+        {
+          type: 'payment',
+          destination: 'GDESTINATION',
+          amount: '0.01',
+          asset: { isNative: () => true, getCode: () => 'XLM', getIssuer: () => '' },
+        },
+      ],
+      memo: { type: 'text', value: { toString: () => 'coffee' } },
+    });
+
+    expect(() => AccountService.validatePaymentTransaction('AAAA', expected)).toThrow(
+      'Payment transaction must contain exactly one operation.'
+    );
+  });
+
+  it('rejects a USDC payment from an untrusted issuer', () => {
+    transactionBuilder.fromXDR.mockReturnValue({
+      source: 'GSOURCE',
+      operations: [
+        {
+          type: 'payment',
+          destination: 'GDESTINATION',
+          amount: '1.25',
+          asset: {
+            isNative: () => false,
+            getCode: () => 'USDC',
+            getIssuer: () => 'GUNTRUSTEDISSUER',
+          },
+        },
+      ],
+      memo: { type: 'text', value: { toString: () => 'coffee' } },
+    });
+
+    expect(() =>
+      AccountService.validatePaymentTransaction('AAAA', {
+        ...expected,
+        asset: 'USDC',
+      })
+    ).toThrow('Unsigned payment does not match the payment intent.');
   });
 });

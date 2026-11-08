@@ -16,7 +16,7 @@ export interface StartWriterSessionOptions {
 }
 
 export async function startWriterSession(
-  request: PaymentRequest,
+  request: PaymentRequest | Uint8Array,
   options: StartWriterSessionOptions = {}
 ): Promise<NfcWriterSession> {
   const timeoutMs = options.timeoutMs ?? NFC_WRITER_TIMEOUT_MS;
@@ -41,7 +41,7 @@ export async function startWriterSession(
     throw new NfcError('DISABLED', 'NFC is disabled. Enable it in system settings.');
   }
 
-  const payload = encodePaymentRequest(request);
+  const payload = request instanceof Uint8Array ? request : encodePaymentRequest(request);
 
   timeoutId = setTimeout(async () => {
     if (cancelled) {

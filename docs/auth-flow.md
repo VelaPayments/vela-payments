@@ -9,7 +9,7 @@ This document describes the complete passkey authentication lifecycle for the Ve
 | Service layer | `src/features/auth/services/PasskeyService.ts` |
 | Error mapping | `src/features/auth/services/authErrors.ts` |
 | Service types | `src/features/auth/services/types.ts` |
-| API stub | `src/features/auth/services/AuthApiClient.ts` |
+| API client | `src/features/auth/services/AuthApiClient.ts` |
 | State machine | `src/features/auth/state/authStore.ts` |
 | React hook | `src/features/auth/hooks/useAuth.ts` |
 | Session policy | `src/features/auth/hooks/useSessionPolicy.ts` |
@@ -40,7 +40,7 @@ stateDiagram-v2
     LOADING --> UNAUTHENTICATED : no credential in store
     LOADING --> LOCKED : credential found (session not established)
 
-    UNAUTHENTICATED --> ONBOARDING : wallet created (future)
+    UNAUTHENTICATED --> ONBOARDING : wallet created
     UNAUTHENTICATED --> READY : passkey registered (PASSKEY_REGISTERED)
 
     ONBOARDING --> READY : passkey registered (PASSKEY_REGISTERED)
@@ -206,18 +206,17 @@ Interrupted        → INTERRUPTED     → "Verification was interrupted…"
 - **SecureKeyStore** uses `requireAuthentication: true` for sensitive keys (credential ID, wallet public key).
 - **Dev reset** is gated behind `__DEV__` and never included in production builds.
 - **Error sanitization**: `sanitizeAuthError()` strips `cause` before any analytics emission.
-- **Challenges**: For production, challenges MUST come from the server (S06) to prevent replay attacks. The current MVP generates them locally.
+- **Challenges**: Registration and payment authorization use server-issued WebAuthn challenges. Local challenge generation remains only for the offline preview path.
 
 ---
 
-## Server coordination (future)
+## Server coordination
 
-`AuthApiClient` (CLI-025) provides typed stub interfaces that mirror anticipated S06/S10 server DTOs:
+`AuthApiClient` uses the live server WebAuthn endpoints for authenticated registration and payment authorization:
 
-- `POST /v1/auth/register/challenge` → `RegisterChallengeResponse`
-- `POST /v1/auth/register/verify` → `RegisterVerifyResponse`
-- `POST /v1/auth/challenge` → `AuthChallengeResponse`
-- `POST /v1/auth/verify` → `AuthVerifyResponse`
-- `POST /v1/auth/revoke` → `RevokeTokenResponse`
+- `POST /v1/webauthn/register/options` → WebAuthn creation options
+- `POST /v1/webauthn/register/verify` → verified credential
+- `POST /v1/webauthn/authenticate/options` → payment-scoped assertion options
+- `POST /v1/payments/:id/authorize` → server-side assertion verification
 
-Replace stub bodies with real `fetch` calls when S06 endpoints are live. Review with S19 observability conventions before shipping to keep client/server auth telemetry compatible.
+The legacy challenge/verify methods remain typed offline-preview fallbacks and must not be treated as production authentication. The server requires a Supabase bearer token and stores WebAuthn challenges and credentials server-side.

@@ -14,7 +14,7 @@ describe('paymentRequest security guard', () => {
   it('rejects a payment request containing a constructor key', () => {
     const payload = {
       type: 'payment_request',
-      recipient: 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66',
+      recipient: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
       asset: 'USDC',
       amount: '1.00',
       timestamp: 1_740_000_000,

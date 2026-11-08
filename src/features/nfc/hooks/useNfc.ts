@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import NfcReader, { isNfcAvailable } from '@/features/nfc/services/NfcReader';
+import { isNfcAvailable, NfcReader } from '@/features/nfc/services/NfcReader';
 import { NfcErrorCode } from '@/features/nfc/services/nfcErrors';
-import { AnalyticsEvents } from '@/constants/analytics-events';
 
 type Status = 'idle' | 'reading' | 'writing' | 'error';
 

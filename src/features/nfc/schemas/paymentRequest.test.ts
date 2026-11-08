@@ -5,7 +5,7 @@ import {
   validateExpiry,
 } from '@/features/nfc/schemas/paymentRequest';
 
-const VALID_RECIPIENT = 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66';
+const VALID_RECIPIENT = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 
 describe('paymentRequest schema', () => {
   const basePayload = {
@@ -53,6 +53,10 @@ describe('paymentRequest schema', () => {
     };
     expect(parsePaymentRequest(optional)).toEqual(optional);
     expect(() => parsePaymentRequest({ ...basePayload, surprise: true })).toThrow();
+  });
+
+  it('rejects memos that exceed Stellar MEMO_TEXT byte capacity', () => {
+    expect(() => parsePaymentRequest({ ...basePayload, memo: 'é'.repeat(15) })).toThrow(/28-byte/i);
   });
 
   it('validateExpiry returns false for past requests', () => {

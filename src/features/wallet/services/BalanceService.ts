@@ -14,6 +14,28 @@ export interface WalletBalances {
   hasUsdcTrustline: boolean;
 }
 
+const ASSET_DECIMAL_SCALE = 10n ** 7n;
+
+function toAssetUnits(value: string): bigint | null {
+  if (!/^\d+(?:\.\d{1,7})?$/.test(value)) return null;
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * ASSET_DECIMAL_SCALE + BigInt(fraction.padEnd(7, '0'));
+}
+
+/**
+ * Performs an obvious balance check before a payment is authorized. Horizon
+ * remains authoritative for reserves, fees, and final transaction validity.
+ */
+export function hasSufficientAssetBalance(
+  balances: WalletBalances,
+  asset: 'XLM' | 'USDC',
+  amount: string
+): boolean {
+  const available = toAssetUnits(asset === 'XLM' ? balances.xlm : (balances.usdc ?? ''));
+  const requested = toAssetUnits(amount);
+  return available !== null && requested !== null && available >= requested;
+}
+
 type AccountBalances = Pick<Horizon.AccountResponse, 'balances'>;
 
 export function parseBalances(account: AccountBalances): WalletBalances {
@@ -48,4 +70,5 @@ export async function fetchBalances(publicKey: string): Promise<WalletBalances> 
 export const BalanceService = {
   parseBalances,
   fetchBalances,
+  hasSufficientAssetBalance,
 };

@@ -15,7 +15,7 @@ import { useAuth } from './useAuth';
 import { AuthErrorCode } from '../services/authErrors';
 import { PasskeyService } from '../services/PasskeyService';
 import { toast } from '@/lib/toast';
-import { SESSION } from '@/constants/session';
+import { env } from '@/lib/env';
 
 export interface UseReAuthResult {
   /** Wrap a sensitive async action behind passkey re-authentication */
@@ -38,7 +38,7 @@ export function useReAuth(): UseReAuthResult {
       setIsAuthenticating(true);
       try {
         const result = await PasskeyService.authenticate({
-          rpId: SESSION.RP_ID,
+          rpId: env.webauthnRpId,
           challenge: '',
           reason: 'Confirma tu identidad para completar esta acción',
         });

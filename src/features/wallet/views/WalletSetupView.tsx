@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
@@ -9,6 +9,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { env } from '@/lib/env';
 import { useWallet } from '@/features/wallet/hooks/useWallet';
 import { FundWalletView } from './FundWalletView';
+import { useAuth } from '@/features/auth/hooks/useAuth';
+import { PaymentApiClient } from '@/features/payments/services/PaymentApiClient';
 
 const READY_REDIRECT_DELAY_MS = 900;
 
@@ -16,17 +18,50 @@ export function WalletSetupView() {
   const router = useRouter();
   const theme = useTheme();
   const { status, publicKey, error, createWallet, checkFunding } = useWallet();
+  const { state: authState } = useAuth();
   const [isChecking, setIsChecking] = useState(false);
+  const [walletLinked, setWalletLinked] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const linkedWallet = useRef<string | null>(null);
+  const isWalletLinked = !authState.sessionToken || walletLinked;
+
+  const linkWallet = useCallback(async () => {
+    if (!publicKey || !authState.sessionToken) {
+      return;
+    }
+    setLinkError(null);
+    try {
+      await PaymentApiClient.linkWallet(
+        authState.sessionToken,
+        publicKey,
+        env.stellarNetwork === 'testnet' ? 'TESTNET' : 'MAINNET'
+      );
+      linkedWallet.current = publicKey;
+      setWalletLinked(true);
+    } catch {
+      linkedWallet.current = null;
+      setWalletLinked(false);
+      setLinkError(
+        'No se pudo vincular la billetera con Vela. Verifica la conexión e inténtalo de nuevo.'
+      );
+    }
+  }, [authState.sessionToken, publicKey]);
 
   useEffect(() => {
-    if (status !== 'ready') return;
+    if (status !== 'ready' || !publicKey) return;
+    if (!authState.sessionToken) return;
+    if (linkedWallet.current !== publicKey) void linkWallet();
+  }, [authState.sessionToken, linkWallet, publicKey, status]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !isWalletLinked) return;
 
     const timer = setTimeout(() => {
       router.replace('/(tabs)/receive');
     }, READY_REDIRECT_DELAY_MS);
 
     return () => clearTimeout(timer);
-  }, [status, router]);
+  }, [isWalletLinked, router, status]);
 
   const handleCreateWallet = useCallback(() => {
     void createWallet();
@@ -72,7 +107,7 @@ export function WalletSetupView() {
           <InfoRow icon="💵" text="USDC se habilita automáticamente cuando hay fondos" />
         </View>
 
-        {status === 'ready' && (
+        {status === 'ready' && isWalletLinked && (
           <View style={[styles.successCard, { backgroundColor: theme.success + '20' }]}>
             <ThemedText type="smallBold" style={{ color: theme.success }}>
               ✓ Billetera lista
@@ -91,19 +126,38 @@ export function WalletSetupView() {
           </View>
         )}
 
-        {status !== 'ready' && (
+        {status === 'ready' && linkError && (
+          <View style={[styles.errorCard, { backgroundColor: theme.error + '20' }]}>
+            <ThemedText type="small" style={{ color: theme.error }}>
+              {linkError}
+            </ThemedText>
+            <Button
+              label="Vincular de nuevo"
+              variant="secondary"
+              onPress={() => void linkWallet()}
+            />
+          </View>
+        )}
+
+        {(status !== 'ready' || !isWalletLinked) && (
           <View style={styles.actions}>
             <Button
               label={
                 status === 'creating'
                   ? 'Creando billetera…'
-                  : status === 'error'
-                    ? 'Intentar de nuevo'
-                    : 'Crear billetera'
+                  : status === 'ready'
+                    ? linkError
+                      ? 'Reintentar vinculación'
+                      : 'Vinculando billetera…'
+                    : status === 'error'
+                      ? 'Intentar de nuevo'
+                      : 'Crear billetera'
               }
-              onPress={handleCreateWallet}
-              loading={status === 'creating'}
-              disabled={status === 'creating'}
+              onPress={status === 'ready' ? () => void linkWallet() : handleCreateWallet}
+              loading={
+                status === 'creating' || (status === 'ready' && !isWalletLinked && !linkError)
+              }
+              disabled={status === 'creating' || (status === 'ready' && !linkError)}
               accessibilityLabel="Crear billetera Stellar"
               accessibilityHint="Genera una billetera y la activa en la red Stellar"
             />

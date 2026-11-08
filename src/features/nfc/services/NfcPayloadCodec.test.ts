@@ -6,7 +6,7 @@ import {
 } from '@/features/nfc/services/NfcPayloadCodec';
 import { NfcError } from '@/features/nfc/services/NfcService.types';
 
-const VALID_RECIPIENT = 'GBBD47IF6LWK7P7MUGHC2XLYUUXV6ZLW75PN7CHLIW2NSIW74UZEST66';
+const VALID_RECIPIENT = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
 
 describe('NfcPayloadCodec', () => {
   const sampleRequest = createPaymentRequest({

@@ -1,11 +1,14 @@
 import { Platform } from 'react-native';
 
-import { NfcErrorCode } from './nfcErrors';
 import { NFC_READER_TIMEOUT_MS } from '@/features/nfc/constants/nfcConstants';
-import { decodePaymentRequest } from '@/features/nfc/services/NfcPayloadCodec';
+import {
+  decodePaymentRequest,
+  encodePaymentRequest,
+} from '@/features/nfc/services/NfcPayloadCodec';
 import type { PaymentRequest } from '@/features/nfc/schemas/paymentRequest';
 import { NfcError, toNfcError } from '@/features/nfc/services/NfcService.types';
 import { nfcService } from '@/features/nfc/services/nfcServiceImpl';
+import { startWriterSession } from '@/features/nfc/services/NfcWriter';
 
 export function isNfcAvailable(): boolean {
   // Basic availability detection: web is not supported here; native platforms
@@ -18,47 +21,102 @@ export function isNfcAvailable(): boolean {
 
 export class NfcReader {
   private cancelled = false;
+  private session: NfcReaderSession | null = null;
+  private pendingReject: ((reason?: unknown) => void) | null = null;
 
-  async startRead(timeoutMs = 30_000): Promise<any> {
-    if (!isNfcAvailable()) throw { code: NfcErrorCode.UNAVAILABLE };
+  async startRead(timeoutMs = NFC_READER_TIMEOUT_MS): Promise<PaymentRequest> {
+    if (!isNfcAvailable()) {
+      throw new NfcError('UNSUPPORTED', 'NFC is not supported on this device');
+    }
     this.cancelled = false;
 
-    // Placeholder implementation: in real app delegate to react-native-nfc-manager
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.cancelled) return reject({ code: NfcErrorCode.CANCELLED });
-        reject({ code: NfcErrorCode.TIMEOUT });
-      }, timeoutMs);
-
-      // Simulate a successful read only if not cancelled (for tests/mocks).
-      // Real implementation will call native APIs and resolve with parsed payload.
-      setTimeout(() => {
-        clearTimeout(timer);
-        if (this.cancelled) return reject({ code: NfcErrorCode.CANCELLED });
-        resolve({ type: 'payment-request.v1', id: 'simulated', expiresAt: Date.now() / 1000 + 60 });
-      }, 600);
+      let completed = false;
+      this.pendingReject = reject;
+      void startReaderSession({
+        timeoutMs,
+        onRequest: (request) => {
+          completed = true;
+          this.pendingReject = null;
+          this.session = null;
+          resolve(request);
+        },
+        onError: (error) => {
+          completed = true;
+          this.pendingReject = null;
+          this.session = null;
+          reject(error);
+        },
+      })
+        .then((session) => {
+          if (completed || this.cancelled) {
+            void session.cancel();
+            return;
+          }
+          this.session = session;
+        })
+        .catch((error) => {
+          if (completed) return;
+          completed = true;
+          this.pendingReject = null;
+          reject(toNfcError(error));
+        });
     });
   }
 
-  async startWrite(_payload: any, timeoutMs = 30_000): Promise<void> {
-    if (!isNfcAvailable()) throw { code: NfcErrorCode.UNAVAILABLE };
+  async startWrite(
+    payload: PaymentRequest | Uint8Array,
+    timeoutMs = NFC_READER_TIMEOUT_MS
+  ): Promise<void> {
+    if (!isNfcAvailable()) {
+      throw new NfcError('UNSUPPORTED', 'NFC is not supported on this device');
+    }
     this.cancelled = false;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.cancelled) return reject({ code: NfcErrorCode.CANCELLED });
-        reject({ code: NfcErrorCode.TIMEOUT });
-      }, timeoutMs);
+    const bytes = payload instanceof Uint8Array ? payload : encodePaymentRequest(payload);
 
-      setTimeout(() => {
-        clearTimeout(timer);
-        if (this.cancelled) return reject({ code: NfcErrorCode.CANCELLED });
-        resolve();
-      }, 400);
+    return new Promise((resolve, reject) => {
+      let completed = false;
+      this.pendingReject = reject;
+      void startWriterSession(bytes, {
+        timeoutMs,
+        onWritten: () => {
+          completed = true;
+          this.pendingReject = null;
+          this.session = null;
+          resolve();
+        },
+        onError: (error) => {
+          completed = true;
+          this.pendingReject = null;
+          this.session = null;
+          reject(error);
+        },
+      })
+        .then((session) => {
+          if (completed || this.cancelled) {
+            void session.cancel();
+            return;
+          }
+          this.session = session;
+        })
+        .catch((error) => {
+          if (completed) return;
+          completed = true;
+          this.pendingReject = null;
+          reject(toNfcError(error));
+        });
     });
   }
 
   cancel() {
     this.cancelled = true;
+    const reject = this.pendingReject;
+    const session = this.session;
+    this.pendingReject = null;
+    this.session = null;
+    void session?.cancel();
+    void nfcService.cancelSession().catch(() => undefined);
+    reject?.(new NfcError('SESSION_CANCELLED', 'NFC session cancelled'));
   }
 }
 

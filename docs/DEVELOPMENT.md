@@ -1,6 +1,6 @@
 # Development guide
 
-Vela is a Stellar testnet payment prototype built with Expo SDK 56, React Native and TypeScript. Physical-device payments and complete backend authentication integration remain under development.
+Vela is a Stellar testnet payment prototype built with Expo SDK 56, React Native and TypeScript. The client and NestJS server now share the payment-intent lifecycle; physical-device settlement is the release verification gate.
 
 ## Requirements
 
@@ -34,10 +34,19 @@ For the browser UI preview, run `npm run web`. Browser NFC and native passkey on
 
 The client reads these public environment variables:
 
+- `EXPO_PUBLIC_API_URL` (include the `/v1` prefix; use a LAN-reachable host
+  when testing on a physical device)
+- `EXPO_PUBLIC_WEBAUTHN_RP_ID` (must exactly match the server's
+  `WEBAUTHN_RP_ID` and the configured associated-domain host)
 - `EXPO_PUBLIC_STELLAR_NETWORK`
 - `EXPO_PUBLIC_HORIZON_URL`
 - `EXPO_PUBLIC_RPC_URL`
 - `EXPO_PUBLIC_USDC_ISSUER`
+
+Server-backed onboarding also requires `EXPO_PUBLIC_SUPABASE_URL` and
+`EXPO_PUBLIC_SUPABASE_ANON_KEY`. For a two-device test, start the server from
+`vela-server/`, use a LAN-reachable API URL, and follow
+`vela-server/docs/testnet-e2e-runbook.md`.
 
 Testnet has public defaults. Mainnet requires explicit values and is not a supported prototype payment deployment. Never put secret keys in `EXPO_PUBLIC_*` variables.
 
