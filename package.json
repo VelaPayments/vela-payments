@@ -9,7 +9,7 @@
     "@emnapi/core": "1.11.2",
     "@emnapi/runtime": "1.11.2",
     "@expo/ui": "~56.0.18",
-    "@stellar/stellar-sdk": "^11.3.0",
+    "@stellar/stellar-sdk": "^17.4.0",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.1",
     "expo": "~56.0.12",
