@@ -1,7 +1,11 @@
 import { NFC_WRITER_TIMEOUT_MS } from '@/features/nfc/constants/nfcConstants';
 import { encodePaymentRequest } from '@/features/nfc/services/NfcPayloadCodec';
 import type { PaymentRequest } from '@/features/nfc/schemas/paymentRequest';
-import { NfcError, toNfcError } from '@/features/nfc/services/NfcService.types';
+import {
+  NfcError,
+  type NfcWriterTransport,
+  toNfcError,
+} from '@/features/nfc/services/NfcService.types';
 import { nfcService } from '@/features/nfc/services/nfcServiceImpl';
 
 export interface NfcWriterSession {
@@ -13,6 +17,7 @@ export interface StartWriterSessionOptions {
   onWritten?: () => void;
   onError?: (error: NfcError) => void;
   alertMessage?: string;
+  transport?: NfcWriterTransport;
 }
 
 export async function startWriterSession(
@@ -21,6 +26,7 @@ export async function startWriterSession(
 ): Promise<NfcWriterSession> {
   const timeoutMs = options.timeoutMs ?? NFC_WRITER_TIMEOUT_MS;
   let cancelled = false;
+  let completed = false;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const cleanup = async () => {
@@ -44,7 +50,7 @@ export async function startWriterSession(
   const payload = request instanceof Uint8Array ? request : encodePaymentRequest(request);
 
   timeoutId = setTimeout(async () => {
-    if (cancelled) {
+    if (cancelled || completed) {
       return;
     }
 
@@ -56,17 +62,18 @@ export async function startWriterSession(
   try {
     await nfcService.startWriterSession(payload, {
       alertMessage: options.alertMessage,
+      transport: options.transport,
       onSuccess: () => {
-        if (cancelled) {
+        if (cancelled || completed) {
           return;
         }
 
-        cancelled = true;
+        completed = true;
         void cleanup();
         options.onWritten?.();
       },
       onError: (error) => {
-        if (cancelled) {
+        if (cancelled || completed) {
           return;
         }
 
@@ -83,7 +90,7 @@ export async function startWriterSession(
 
   return {
     cancel: async () => {
-      if (cancelled) {
+      if (cancelled || completed) {
         return;
       }
 
