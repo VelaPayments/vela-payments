@@ -14,9 +14,12 @@ type AndroidNfcManager = typeof NfcManager & {
   setNdefPushMessage?: (bytes: number[] | null) => Promise<void>;
 };
 
-const nfcManager = NfcManager as AndroidNfcManager;
+function getAndroidNfcManager(): AndroidNfcManager | undefined {
+  return (NfcManager as AndroidNfcManager | null | undefined) ?? undefined;
+}
 
 let sessionKind: 'reader' | 'writer' | null = null;
+let activeSessionId = 0;
 
 function payloadFromTag(tag: TagEvent): Uint8Array | null {
   for (const record of tag.ndefMessage ?? []) {
@@ -40,17 +43,19 @@ function buildNdefMessage(payload: Uint8Array): number[] {
 }
 
 async function cleanupSession(): Promise<void> {
-  NfcManager.setEventListener(NfcEvents.DiscoverTag, null);
-  NfcManager.setEventListener(NfcEvents.SessionClosed, null);
-
-  await NfcManager.unregisterTagEvent().catch(() => undefined);
-  await NfcManager.cancelTechnologyRequest({ throwOnError: false }).catch(() => undefined);
-
-  if (Platform.OS === 'android') {
-    await nfcManager.setNdefPushMessage?.(null).catch(() => undefined);
-  }
-
+  activeSessionId = 0;
   sessionKind = null;
+
+  NfcManager?.setEventListener?.(NfcEvents.DiscoverTag, null);
+  NfcManager?.setEventListener?.(NfcEvents.SessionClosed, null);
+
+  await NfcManager?.unregisterTagEvent?.().catch(() => undefined);
+  await NfcManager?.cancelTechnologyRequest?.({ throwOnError: false }).catch(() => undefined);
+
+  const androidManager = getAndroidNfcManager();
+  if (Platform.OS === 'android' && typeof androidManager?.setNdefPushMessage === 'function') {
+    await androidManager.setNdefPushMessage(null).catch(() => undefined);
+  }
 }
 
 export const nfcService: NfcService = {
@@ -116,35 +121,101 @@ export const nfcService: NfcService = {
       throw new NfcError('SESSION_ACTIVE', 'An NFC session is already active');
     }
 
-    sessionKind = 'writer';
-    await NfcManager.start();
+    const transport = options.transport ?? (Platform.OS === 'android' ? 'peer' : 'tag');
+    const androidManager = getAndroidNfcManager();
 
-    const bytes = buildNdefMessage(payload);
-
-    if (Platform.OS === 'android') {
-      await nfcManager.setNdefPushMessage?.(bytes);
-      options.onSuccess?.();
-      return;
+    if (Platform.OS === 'android' && transport === 'peer') {
+      if (typeof androidManager?.setNdefPushMessage !== 'function') {
+        throw new NfcError(
+          'UNSUPPORTED',
+          'Android phone-to-phone NFC push is unavailable on this device. Write to a writable NDEF tag or share the payment request another way.'
+        );
+      }
+    } else if (
+      typeof NfcManager?.registerTagEvent !== 'function' ||
+      typeof NfcManager?.ndefHandler?.writeNdefMessage !== 'function'
+    ) {
+      throw new NfcError('UNSUPPORTED', 'NFC NDEF tag writing is unavailable on this device.');
     }
 
-    NfcManager.setEventListener(NfcEvents.DiscoverTag, async () => {
-      try {
-        await NfcManager.requestTechnology(NfcTech.Ndef, {
-          alertMessage: options.alertMessage ?? 'Hold your phone near the payer device',
-        });
-        await NfcManager.ndefHandler.writeNdefMessage(bytes);
-        options.onSuccess?.();
-      } catch (error) {
-        options.onError?.(toNfcError(error));
-      } finally {
-        await NfcManager.cancelTechnologyRequest({ throwOnError: false }).catch(() => undefined);
-      }
-    });
+    const currentSessionId = Date.now() + Math.random();
+    activeSessionId = currentSessionId;
+    sessionKind = 'writer';
 
-    await NfcManager.registerTagEvent({
-      alertMessage: options.alertMessage ?? 'Ready to share payment request',
-      invalidateAfterFirstRead: false,
-    });
+    try {
+      await NfcManager.start();
+      if (activeSessionId !== currentSessionId) {
+        await cleanupSession();
+        return;
+      }
+
+      const bytes = buildNdefMessage(payload);
+
+      if (Platform.OS === 'android' && transport === 'peer') {
+        const pushMessage = getAndroidNfcManager()?.setNdefPushMessage;
+        if (typeof pushMessage !== 'function') {
+          throw new NfcError(
+            'UNSUPPORTED',
+            'Android phone-to-phone NFC push is unavailable on this device. Write to a writable NDEF tag or share the payment request another way.'
+          );
+        }
+
+        await pushMessage(bytes);
+        if (activeSessionId !== currentSessionId) {
+          await cleanupSession();
+          return;
+        }
+
+        sessionKind = null;
+        activeSessionId = 0;
+        options.onSuccess?.();
+        return;
+      }
+
+      NfcManager.setEventListener(NfcEvents.DiscoverTag, async () => {
+        if (activeSessionId !== currentSessionId) {
+          return;
+        }
+
+        try {
+          await NfcManager.requestTechnology(NfcTech.Ndef, {
+            alertMessage: options.alertMessage ?? 'Hold your phone near a writable NFC tag',
+          });
+          if (activeSessionId !== currentSessionId) {
+            return;
+          }
+
+          await NfcManager.ndefHandler.writeNdefMessage(bytes);
+          if (activeSessionId !== currentSessionId) {
+            return;
+          }
+
+          await cleanupSession();
+          options.onSuccess?.();
+        } catch (error) {
+          if (activeSessionId !== currentSessionId) {
+            return;
+          }
+
+          await cleanupSession();
+          options.onError?.(toNfcError(error));
+        } finally {
+          await NfcManager.cancelTechnologyRequest({ throwOnError: false }).catch(() => undefined);
+        }
+      });
+
+      await NfcManager.registerTagEvent({
+        alertMessage: options.alertMessage ?? 'Ready to write payment request to NFC tag',
+        invalidateAfterFirstRead: false,
+      });
+
+      if (activeSessionId !== currentSessionId) {
+        await cleanupSession();
+      }
+    } catch (error) {
+      await cleanupSession();
+      throw toNfcError(error);
+    }
   },
 };
 

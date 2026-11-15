@@ -26,14 +26,15 @@ Security rules
 - Replay protection: 5-minute TTL dedupe window; duplicate requests rejected deterministically.
 - Clock skew tolerance: 30s default; configurable in validator.
 
-Platform notes
-- iOS: Core NFC requires entitlement `com.apple.developer.nfc.readersession.formats` and `NFCReaderUsageDescription` in Info.plist. Only physical devices supported.
-- Android: Add `android.permission.NFC` and handle foreground dispatch. Test on Pixel and Samsung-class devices.
+Platform and transport notes
+- **Writable NDEF tags vs. phone-to-phone transport:** `NfcService.native` writes `payment-request.v1` NDEF MIME records to writable NDEF tags (`Ndef.writeNdefMessage`) and reads NDEF tags in reader mode. Generic phone-to-phone NFC delivery is **not** promised across modern iOS and Android devices because Host Card Emulation (HCE) is not implemented in this prototype.
+- **iOS:** Core NFC requires entitlement `com.apple.developer.nfc.readersession.formats` and `NFCReaderUsageDescription` in Info.plist. Supports reading NDEF payloads and writing to writable NDEF tags on physical devices only; iPhone-to-iPhone NDEF push is not provided by Core NFC tag sessions.
+- **Android:** Requires `android.permission.NFC` and foreground reader/tag dispatch. Android Beam (`setNdefPushMessage`) was removed in Android 10+ and is absent in `react-native-nfc-manager` v3; when peer push is unavailable on the runtime, starting a peer writer session fails with `UNSUPPORTED` instead of reporting delivery. Explicit `{ transport: 'tag' }` writer sessions write to writable NDEF tags.
 
 Troubleshooting
-- NFC Unavailable: ensure device supports NFC and app has permissions.
+- NFC Unavailable / Unsupported Transport: ensure the device supports NFC, app permissions are granted, and use a writable NDEF tag when native phone-to-phone push is unavailable.
 - NFC Disabled: ask user to enable in OS settings.
-- Timeout: ask users to bring devices closer and retry.
+- Timeout: ask users to hold the device steady against the writable tag or supported NFC target and retry.
 
 ## Validation and compatibility
 

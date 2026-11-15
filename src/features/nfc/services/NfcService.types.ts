@@ -38,10 +38,13 @@ export interface NfcReaderSessionOptions {
   alertMessage?: string;
 }
 
+export type NfcWriterTransport = 'peer' | 'tag';
+
 export interface NfcWriterSessionOptions {
   onSuccess?: () => void;
   onError?: (error: NfcError) => void;
   alertMessage?: string;
+  transport?: NfcWriterTransport;
 }
 
 export interface NfcService {

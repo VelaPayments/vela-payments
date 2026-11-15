@@ -6,7 +6,7 @@
 
 ## Context
 
-Vela requires peer-to-peer NFC transport for payment-request payloads on iOS and Android. Expo Go does not expose native NFC APIs; a development build is mandatory.
+Vela requires contactless NDEF transport for payment-request payloads on iOS and Android where supported by platform hardware and OS APIs. Expo Go does not expose native NFC APIs; a development build is mandatory. Generic phone-to-phone NFC delivery requires Host Card Emulation (HCE), which is outside the scope of this NDEF adapter.
 
 ## Decision
 
@@ -36,8 +36,8 @@ Use **react-native-nfc-manager** (v3.17+) with the official Expo config plugin.
 
 | Platform | Capability | Notes |
 |----------|------------|-------|
-| Android | NDEF push + tag reader mode | Primary P2P path via `setNdefPushMessage` |
-| iOS | Core NFC reader / NDEF write to tags | P2P limited; validate on physical hardware |
+| Android | Tag reader mode + writable NDEF tag write | Android Beam (`setNdefPushMessage`) was removed in Android 10+; missing peer-push capability returns `UNSUPPORTED` rather than false success, and HCE is out of scope |
+| iOS | Core NFC reader + writable NDEF tag write | Writes target writable NDEF tags only; generic phone-to-phone delivery is not promised |
 | Web | Not supported | Stub returns `isSupported: false` |
 | Expo Go | Not supported | Requires dev build rebuild after native changes |
 
